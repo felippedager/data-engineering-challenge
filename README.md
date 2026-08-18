@@ -1,8 +1,8 @@
-# Datarisk Data Engineering Challenge
+# WeCogno Data Engineering Challenge
 
 ## Apresentação
 
-Olá candidato(a), esse é o desafio prático para o time de **Engenharia de dados** da Datarisk!
+Olá candidato(a), esse é o desafio prático para o time de **Engenharia de dados** da WeCogno!
 
 O objetivo desse desafio é entendermos melhor o seu nível técnico, então sugerimos um projeto que utiliza ferramentas bastante comuns na vida de um engenheiro de dados.
 
