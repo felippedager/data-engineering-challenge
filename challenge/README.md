@@ -1,18 +1,10 @@
-# Data Engineering Challenge
+# Solução — WeCogno Data Engineering Challenge
 
-Pipeline de dados desenvolvido para processamento dos dados de viagens de táxi de Nova York (NYC TLC), utilizando Apache Airflow, PostgreSQL e Docker.
+Este diretório contém a implementação do desafio técnico de Engenharia de Dados da WeCogno.
 
-## 1. Objetivo
+A solução foi desenvolvida utilizando Apache Airflow, PostgreSQL e Docker, com o objetivo de construir um processo de ETL para os dados de corridas de táxi de Nova York referentes ao ano de 2022.
 
-Construir um pipeline ETL capaz de:
-
-* Ler os dados mensais de viagens de táxi disponibilizados em formato Parquet;
-* Carregar os dados em PostgreSQL;
-* Organizar os dados em camadas `raw`, `trusted` e `refined`;
-* Aplicar validações básicas de qualidade;
-* Responder às perguntas propostas no desafio.
-
-## 2. Tecnologias utilizadas
+## Tecnologias utilizadas
 
 * Python
 * Apache Airflow 3.1.0
@@ -21,79 +13,47 @@ Construir um pipeline ETL capaz de:
 * Pandas
 * PyArrow
 
-## 3. Estrutura do projeto
+## Arquitetura
 
-```text
-data-engineering-challenge/
-├── challenge/
-│   ├── dags/
-│   │   └── nyc_taxi_etl.py
-│   ├── sql/
-│   │   └── create_tables.sql
-│   ├── docker-compose.yaml
-│   └── README.md
-│
-└── nyc-tlc-data/
-    ├── yellow_tripdata_2022-01.parquet.gz
-    ├── yellow_tripdata_2022-02.parquet.gz
-    ├── ...
-    └── yellow_tripdata_2022-12.parquet.gz
-```
-
-Os arquivos de dados são montados no container do Airflow em modo somente leitura.
-
-## 4. Arquitetura do ETL
-
-O pipeline foi dividido em três camadas:
+O processo foi organizado em três camadas de dados:
 
 ```text
 Parquet
    │
    ▼
-┌─────────────┐
-│     RAW     │
-│ Dados brutos│
-└─────────────┘
-   │
-   ▼
-┌─────────────┐
-│   TRUSTED   │
-│ Padronização│
-└─────────────┘
-   │
-   ▼
-┌─────────────┐
-│   REFINED   │
-│ Dados finais│
-└─────────────┘
+┌──────────┐
+│   RAW    │
+└────┬─────┘
+     │
+     ▼
+┌──────────┐
+│ TRUSTED  │
+└────┬─────┘
+     │
+     ▼
+┌──────────┐
+│ REFINED  │
+└──────────┘
 ```
 
 ### Raw
 
-A camada `raw` recebe os dados diretamente dos arquivos Parquet, mantendo a estrutura original dos registros e realizando apenas a padronização dos nomes das colunas para `snake_case`.
+A camada `raw` recebe os dados diretamente dos arquivos Parquet.
 
-Tabela:
-
-```text
-raw.yellow_tripdata
-```
+Foi mantida a estrutura original dos dados, realizando apenas a padronização dos nomes das colunas para `snake_case`.
 
 ### Trusted
 
-A camada `trusted` recebe os dados da camada `raw` e padroniza os nomes dos campos de data:
+Na camada `trusted`, os dados são transformados para uma estrutura mais consistente para utilização nas etapas seguintes.
+
+As colunas de data e hora são padronizadas:
 
 * `tpep_pickup_datetime` → `pickup_datetime`
 * `tpep_dropoff_datetime` → `dropoff_datetime`
 
-Tabela:
-
-```text
-trusted.yellow_tripdata
-```
-
 ### Refined
 
-A camada `refined` contém os dados utilizados nas análises finais.
+A camada `refined` contém os dados utilizados nas análises solicitadas pelo desafio.
 
 Foram aplicadas as seguintes validações:
 
@@ -102,98 +62,178 @@ Foram aplicadas as seguintes validações:
 * `dropoff_datetime` deve ser maior ou igual a `pickup_datetime`;
 * `trip_distance` deve ser maior ou igual a zero.
 
-Tabela:
+## Estrutura do projeto
 
 ```text
-refined.yellow_tripdata
+challenge/
+├── dags/
+│   └── nyc_taxi_etl.py
+├── sql/
+│   └── create_tables.sql
+├── docker-compose.yaml
+└── README.md
 ```
 
-## 5. DAG
-
-O DAG utilizado foi:
+Os dados de entrada permanecem no diretório `nyc-tlc-data`, localizado na raiz do projeto:
 
 ```text
-nyc_taxi_etl
+data-engineering-challenge/
+├── README.md
+├── nyc-tlc-data/
+│   ├── yellow_tripdata_2022-01.parquet.gz
+│   ├── ...
+│   └── yellow_tripdata_2022-12.parquet.gz
+└── challenge/
+    ├── dags/
+    ├── sql/
+    ├── docker-compose.yaml
+    └── README.md
 ```
 
-O fluxo de execução é:
+## Configuração do ambiente
 
-```text
-create_tables
-      ↓
-load_raw_data
-      ↓
-transform_trusted
-      ↓
-load_refined
-      ↓
-quality_checks
+A infraestrutura é executada utilizando Docker Compose.
+
+O ambiente possui:
+
+* Apache Airflow;
+* PostgreSQL;
+* Airflow Scheduler;
+* Airflow DAG Processor;
+* Airflow API Server.
+
+O PostgreSQL utilizado pelo desafio é o mesmo banco utilizado pelo ambiente do Airflow, com as tabelas do desafio organizadas nos schemas `raw`, `trusted` e `refined`.
+
+### Variáveis de ambiente
+
+As chaves utilizadas pelo Airflow não são armazenadas diretamente no `docker-compose.yaml`.
+
+Crie um arquivo `.env` dentro do diretório `challenge` contendo:
+
+```env
+AIRFLOW_JWT_SECRET=defina_um_valor
+AIRFLOW_FERNET_KEY=defina_um_valor
 ```
 
-### `create_tables`
+O `docker-compose.yaml` utiliza essas variáveis para configurar:
 
-Cria os schemas e tabelas necessários no PostgreSQL:
-
-* `raw`
-* `trusted`
-* `refined`
-
-### `load_raw_data`
-
-Percorre os 12 arquivos mensais de 2022, lê os dados com Pandas e insere os registros na tabela `raw.yellow_tripdata`.
-
-### `transform_trusted`
-
-Copia os dados da camada `raw` para `trusted`, realizando a padronização dos nomes das colunas de data.
-
-### `load_refined`
-
-Carrega os dados da camada `trusted` para `refined` aplicando as validações de qualidade definidas.
-
-### `quality_checks`
-
-Verifica se a tabela final contém registros.
-
-## 6. Execução
-
-Com Docker e Docker Compose instalados, acessar a pasta:
-
-```bash
-cd challenge
+```yaml
+AIRFLOW__API_AUTH__JWT_SECRET: "${AIRFLOW_JWT_SECRET}"
+AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW_FERNET_KEY}"
 ```
 
-Inicializar os containers:
+O arquivo `.env` deve permanecer fora do controle de versão.
+
+## Execução
+
+A partir do diretório `challenge`, execute:
 
 ```bash
 docker compose up -d
 ```
 
-O Airflow estará disponível na porta:
+Depois, verifique o estado dos containers:
+
+```bash
+docker compose ps
+```
+
+O Airflow fica disponível em:
 
 ```text
 http://localhost:8080
 ```
 
-Após a inicialização, o DAG `nyc_taxi_etl` pode ser executado manualmente pela interface do Airflow.
+Após a inicialização do ambiente, o DAG `nyc_taxi_etl` pode ser executado pela interface do Airflow ou pela CLI:
 
-## 7. Resultados
+```bash
+docker compose exec airflow-scheduler airflow dags trigger nyc_taxi_etl
+```
 
-Após a execução completa do pipeline, a tabela final `refined.yellow_tripdata` apresentou:
+## Processo de ETL
 
-### 7.1 Total de registros
+O DAG `nyc_taxi_etl` é composto pelas seguintes etapas:
+
+```text
+create_tables
+      │
+      ▼
+load_raw_data
+      │
+      ▼
+transform_trusted
+      │
+      ▼
+load_refined
+      │
+      ▼
+quality_checks
+```
+
+### 1. `create_tables`
+
+Cria os schemas e tabelas necessários no PostgreSQL:
+
+* `raw.yellow_tripdata`
+* `trusted.yellow_tripdata`
+* `refined.yellow_tripdata`
+
+O comando utilizado está no arquivo:
+
+```text
+sql/create_tables.sql
+```
+
+### 2. `load_raw_data`
+
+Percorre os arquivos:
+
+```text
+yellow_tripdata_2022-01.parquet.gz
+...
+yellow_tripdata_2022-12.parquet.gz
+```
+
+Os arquivos são lidos utilizando Pandas/PyArrow e carregados na tabela:
+
+```text
+raw.yellow_tripdata
+```
+
+### 3. `transform_trusted`
+
+Copia os dados da camada `raw` para a camada `trusted`, realizando a padronização dos nomes das colunas de data e hora.
+
+### 4. `load_refined`
+
+Carrega os dados válidos na camada `refined`, aplicando as regras de qualidade descritas anteriormente.
+
+### 5. `quality_checks`
+
+Realiza uma validação final para garantir que a tabela `refined.yellow_tripdata` não esteja vazia.
+
+## Resultados
+
+Após a execução do processo de ETL, foram obtidos os seguintes resultados.
+
+### 1. Qual o total de registros na tabela final?
+
+**39.642.485 registros**
+
+Query utilizada:
 
 ```sql
 SELECT COUNT(*) AS total_records
 FROM refined.yellow_tripdata;
 ```
 
-Resultado:
+### 2. Qual o total de viagens iniciadas e finalizadas no dia 17 de junho?
 
-```text
-39.642.485
-```
+**Viagens iniciadas:** 125.586
 
-### 7.2 Viagens iniciadas e finalizadas em 17 de junho
+**Viagens finalizadas:** 125.342
+
+Query utilizada:
 
 ```sql
 SELECT
@@ -206,16 +246,16 @@ SELECT
 FROM refined.yellow_tripdata;
 ```
 
-Resultado:
+### 3. Qual foi o dia da viagem mais longa percorrida?
 
-| Métrica                           |   Total |
-| --------------------------------- | ------: |
-| Viagens iniciadas em 17/06/2022   | 125.586 |
-| Viagens finalizadas em 17/06/2022 | 125.342 |
+A maior distância encontrada foi:
 
-### 7.3 Dia da viagem mais longa
+* **Data:** 28/10/2022
+* **Distância:** 389.678,46
+* **Início:** 2022-10-28 05:19:00
+* **Fim:** 2022-10-28 05:32:00
 
-A maior distância registrada foi identificada com:
+Query utilizada:
 
 ```sql
 SELECT
@@ -230,16 +270,23 @@ WHERE trip_distance = (
 );
 ```
 
-Resultado:
+O valor encontrado representa um possível outlier, considerando a distância registrada em relação às demais viagens.
 
-```text
-Dia: 28/10/2022
-Distância: 389.678,46
-Início: 05:19:00
-Fim: 05:32:00
-```
+O registro foi mantido na tabela final porque o desafio não especifica uma regra para identificação ou remoção de outliers. Dessa forma, a solução preserva os dados de origem e deixa explícita a ocorrência para análise.
 
-### 7.4 Estatísticas de `trip_distance`
+### 4. Estatísticas da distribuição de distância percorrida
+
+| Estatística   |      Valor |
+| ------------- | ---------: |
+| Média         |   5,959406 |
+| Desvio padrão | 599,293571 |
+| Mínimo        |          0 |
+| Q1            |        1,1 |
+| Mediana       |        1,9 |
+| Q3            |       3,56 |
+| Máximo        | 389.678,46 |
+
+Query utilizada:
 
 ```sql
 SELECT
@@ -256,53 +303,41 @@ SELECT
 FROM refined.yellow_tripdata;
 ```
 
-Resultado:
+A diferença entre a mediana e a média, assim como o desvio padrão elevado, é influenciada principalmente pelo valor extremo observado na distância máxima.
 
-| Estatística   |      Valor |
-| ------------- | ---------: |
-| Média         |     5,9594 |
-| Desvio padrão |   599,2936 |
-| Mínimo        |          0 |
-| Q1 (25%)      |       1,10 |
-| Mediana (50%) |       1,90 |
-| Q3 (75%)      |       3,56 |
-| Máximo        | 389.678,46 |
+## Decisões técnicas
 
-## 8. Observação sobre qualidade dos dados
+### Separação em camadas
 
-Durante a análise foi identificado um valor extremo de `trip_distance` de `389.678,46`.
+Foi utilizada a separação `raw → trusted → refined` para deixar explícita a evolução dos dados durante o processo de ETL.
 
-O registro possui horário de início às `05:19` e término às `05:32`, indicando uma duração de aproximadamente 13 minutos.
+Essa estrutura facilita a rastreabilidade e permite identificar em qual etapa uma transformação ou regra de qualidade foi aplicada.
 
-Como o desafio não definiu uma regra específica para tratamento de outliers, o registro foi mantido na camada `refined` e considerado nos cálculos estatísticos.
+### Manutenção do registro extremo
 
-A decisão foi evitar a remoção ou alteração de registros com base em uma regra de negócio que não foi especificada no escopo do desafio.
+O registro com distância de `389.678,46` não foi removido.
 
-## 9. Decisões técnicas
+Apesar de aparentar ser um outlier, não foi definida uma regra estatística ou de negócio no enunciado para determinar quais registros deveriam ser descartados.
 
-### Padronização das colunas
+Por esse motivo, a decisão foi manter o registro e documentar seu impacto nas estatísticas.
 
-Os nomes das colunas foram convertidos para `snake_case`, mantendo os dados originais e facilitando a utilização no PostgreSQL.
+### PostgreSQL
 
-### Tipos de dados
+O PostgreSQL foi utilizado tanto para armazenamento dos dados quanto para execução das transformações SQL.
 
-Os tipos foram definidos considerando os tipos encontrados nos arquivos Parquet. Campos como `passenger_count` e `ratecode_id` foram mantidos como `DOUBLE PRECISION`, pois foram identificados como valores `float64` na origem.
+### Airflow
 
-### Camadas de dados
+O Airflow foi utilizado para orquestrar o processo, garantindo uma sequência definida entre criação das tabelas, ingestão, transformação e validação.
 
-A separação entre `raw`, `trusted` e `refined` foi utilizada para deixar explícitas as diferentes etapas do processamento e facilitar a rastreabilidade dos dados.
+## Possíveis melhorias
 
-### Tratamento de outliers
+Algumas melhorias poderiam ser implementadas em uma evolução da solução:
 
-Não foram aplicadas regras arbitrárias para remoção de outliers. Valores extremos foram mantidos quando não havia uma regra de negócio definida no desafio.
+* utilizar `COPY` ou outro mecanismo de bulk loading do PostgreSQL para acelerar a ingestão dos arquivos;
+* tornar a carga da camada `raw` totalmente idempotente, evitando duplicações em caso de reexecução do DAG;
+* adicionar verificações de qualidade mais abrangentes, como análise de valores nulos, limites de distância e consistência de valores financeiros;
+* adicionar testes automatizados para as transformações;
+* adicionar monitoramento e alertas para falhas na execução do pipeline;
+* parametrizar o período de dados a ser processado.
 
-## 10. Possíveis melhorias
-
-Como evolução do pipeline, algumas melhorias poderiam ser consideradas:
-
-* Utilizar PostgreSQL `COPY` ou outra estratégia de bulk load para otimizar a ingestão de grandes volumes;
-* Tornar a carga da camada `raw` totalmente idempotente para permitir reexecuções sem duplicação;
-* Adicionar checks de qualidade mais abrangentes;
-* Implementar monitoramento de volume e duração das etapas;
-* Adicionar testes automatizados para as transformações;
-* Parametrizar o período dos arquivos processados.
+Essas melhorias não foram adicionadas à implementação principal para manter a solução objetiva e alinhada ao escopo solicitado no desafio.
