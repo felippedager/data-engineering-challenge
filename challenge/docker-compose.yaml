@@ -8,8 +8,8 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "airflow:admin"
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-webserver:8080/execution/"
-    AIRFLOW__API_AUTH__JWT_SECRET: "nyc_taxi_challenge_jwt_secret_2026"
-    AIRFLOW__CORE__FERNET_KEY: "oiYp6nmyDBSdpJpVYTYKnB2_WBmuRw1mX10_3TX08pc="
+    AIRFLOW__API_AUTH__JWT_SECRET: "${AIRFLOW_JWT_SECRET}"
+    AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW_FERNET_KEY}"
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
